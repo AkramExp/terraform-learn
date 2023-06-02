@@ -1,18 +1,33 @@
 provider "aws" {}
 
-variable "subnet_cidr_block" {
-    description = "subnet cidr block"
-}
-
-resource "aws_vpc" "development-vpc" {
-    cidr_block = var.subnet_cidr_block
+resource "aws_vpc" "myapp-vpc" {
+    cidr_block = var.vpc_cidr_block
     tags = {
-        Name: "development"
+        Name: "${var.env_prefix}-vpc"
     }
 }
 
-resource "aws_subnet" "dev-subnet-1" {
-    vpc_id = aws_vpc.development-vpc.id
-    cidr_block = "10.0.10.0/24"
-    availability_zone = "ap-south-1a"
+module "myapp-subnet" {
+    source = "./module/subnet"
+    vpc_id = aws_vpc.myapp-vpc.id
+    subnet_cidr_block = var.subnet_cidr_block
+    avail_zone = var.avail_zone
+    env_prefix = var.env_prefix
+    default_route_table_id = aws_vpc.myapp-vpc.default_route_table_id
+}
+
+module "myapp-server" {
+    source = "./module/webserver"
+    vpc_id = aws_vpc.myapp-vpc.id
+    my_ip = var.my_ip
+    env_prefix = var.env_prefix
+    image_name = var.image_name
+    public_key_location = var.public_key_location
+    instance_type = var.instance_type
+    subnet_id = module.myapp-subnet.subnet.id
+    avail_zone = var.avail_zone
+}
+
+output "ec2_public_key" {
+    value = module.myapp-server.webserver.public_ip
 }
